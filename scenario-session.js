@@ -19,6 +19,9 @@
 
   function resolveProduction(state,{eclipse=false}={}){
     const facilities=state.facilities||[];
+    const awakeBefore=Math.max(0,state.awake||0);
+    // A sleeping or not-yet-arrived crew cannot operate life support.
+    if(awakeBefore===0)for(const facility of facilities)facility.workers=0;
     const ordered=[...facilities].sort((a,b)=>a.order-b.order);
     const active=ordered.filter(facility=>(facility.type==='water'||facility.type==='oxygen')&&facility.workers===LIFE_SUPPORT_WORKERS);
     const power=ScenarioRules.resolvePower({
@@ -34,7 +37,6 @@
       if(active[index].type==='water')water+=LIFE_SUPPORT_OUTPUT;
       else oxygen+=LIFE_SUPPORT_OUTPUT;
     }
-    const awakeBefore=Math.max(0,state.awake||0);
     const supported=Math.min(awakeBefore,water,oxygen);
     const lost=awakeBefore-supported;
     state.battery=power.storedPower;
@@ -45,6 +47,7 @@
     if(lost>0){
       state.awake=supported;
       state.cryo=(state.cryo||0)+lost;
+      if(supported===0)for(const facility of facilities)facility.workers=0;
     }
     return {
       ...power,
@@ -64,6 +67,7 @@
 
   function runAutonomy(state,{rounds=10,eclipseRound=null,requiredAwake=4,onRound}={}){
     const reports=[];
+    if((state.awake||0)<requiredAwake)return {result:'lose',failedRound:0,reports};
     for(let round=1;round<=rounds;round++){
       const report={round,...resolveProduction(state,{eclipse:round===eclipseRound})};
       reports.push(report);
